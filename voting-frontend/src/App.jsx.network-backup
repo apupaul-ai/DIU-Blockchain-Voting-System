@@ -1,0 +1,495 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BrowserProvider, Contract, JsonRpcProvider } from "ethers";
+import votingArtifact from "./contracts/Voting.json";
+import "./App.css";
+
+const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const RPC_URL = "http://127.0.0.1:8545";
+const CHAIN_ID = 31337n;
+const ABI = votingArtifact.abi;
+const readProvider = new JsonRpcProvider(RPC_URL);
+
+function shortAddress(address) {
+  if (!address) return "Not connected";
+  return address.slice(0, 6) + "..." + address.slice(-4);
+}
+
+function errorText(error) {
+  if (error.code === 4001 || error.code === "ACTION_REJECTED") {
+    return "Transaction cancelled by the user.";
+  }
+  return error.shortMessage || error.reason || error.message || "Something went wrong.";
+}
+
+export default function App() {
+  const [account, setAccount] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [online, setOnline] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState({
+    kind: "info",
+    text: "Connect MetaMask to participate in this local election."
+  });
+
+  const refresh = useCallback(async (walletAddress = "") => {
+    const code = await readProvider.getCode(CONTRACT_ADDRESS);
+
+    if (code === "0x") {
+      throw new Error("Contract not found. Check the deployment address and Hardhat node.");
+    }
+
+    const contract = new Contract(CONTRACT_ADDRESS, ABI, readProvider);
+    const count = Number(await contract.candidateCount());
+
+    const results = await Promise.all(
+      Array.from({ length: count }, async (_, index) => {
+        const candidate = await contract.candidates(index + 1);
+        return {
+          id: Number(candidate.id),
+          name: candidate.name,
+          votes: Number(candidate.voteCount)
+        };
+      })
+    );
+
+    setCandidates(results);
+    setHasVoted(
+      walletAddress
+        ? await contract.hasVoted(walletAddress)
+        : false
+    );
+    setOnline(true);
+  }, []);
+
+  useEffect(() => {
+    async function initialize() {
+      try {
+        await refresh();
+
+        if (window.ethereum) {
+          const accounts = await window.ethereum.request({
+            method: "eth_accounts"
+          });
+          const chainId = await window.ethereum.request({
+            method: "eth_chainId"
+          });
+
+          if (accounts.length && BigInt(chainId) === CHAIN_ID) {
+            setAccount(accounts[0]);
+            await refresh(accounts[0]);
+          }
+        }
+      } catch (error) {
+        setNotice({ kind: "error", text: errorText(error) });
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    initialize();
+
+    if (!window.ethereum) return;
+
+    async function accountsChanged(accounts) {
+      const nextAccount = accounts[0] || "";
+      setAccount(nextAccount);
+      setHasVoted(false);
+
+      try {
+        await refresh(nextAccount);
+      } catch (error) {
+        setNotice({ kind: "error", text: errorText(error) });
+      }
+    }
+
+    function chainChanged() {
+      window.location.reload();
+    }
+
+    window.ethereum.on?.("accountsChanged", accountsChanged);
+    window.ethereum.on?.("chainChanged", chainChanged);
+
+    return () => {
+      window.ethereum.removeListener?.("accountsChanged", accountsChanged);
+      window.ethereum.removeListener?.("chainChanged", chainChanged);
+    };
+  }, [refresh]);
+
+  const totalVotes = useMemo(
+    () => candidates.reduce((sum, candidate) => sum + candidate.votes, 0),
+    [candidates]
+  );
+
+  const leader = useMemo(() => {
+    if (!candidates.length || totalVotes === 0) return null;
+    const maxVotes = Math.max(...candidates.map(c => c.votes));
+    const leaders = candidates.filter(c => c.votes === maxVotes);
+    return leaders.length === 1 ? leaders[0] : null;
+  }, [candidates, totalVotes]);
+
+  async function getWalletProvider() {
+    if (!window.ethereum) {
+      throw new Error("MetaMask not found. Please install the extension.");
+    }
+
+    const provider = new BrowserProvider(window.ethereum);
+    const network = await provider.getNetwork();
+
+    if (network.chainId !== CHAIN_ID) {
+      throw new Error("Switch MetaMask to Hardhat Local (Chain ID 31337).");
+    }
+
+    return provider;
+  }
+
+  async function connectWallet() {
+    setBusy(true);
+    try {
+      const provider = await getWalletProvider();
+      const accounts = await provider.send("eth_requestAccounts", []);
+
+      if (!accounts.length) {
+        throw new Error("No wallet account selected.");
+      }
+
+      await refresh(accounts[0]);
+      setAccount(accounts[0]);
+      setNotice({
+        kind: "success",
+        text: "Wallet connected. You can now participate in the election."
+      });
+    } catch (error) {
+      setNotice({ kind: "error", text: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshResults() {
+    setBusy(true);
+    try {
+      await refresh(account);
+      setNotice({
+        kind: "success",
+        text: "Latest voting results loaded from the blockchain."
+      });
+    } catch (error) {
+      setOnline(false);
+      setNotice({ kind: "error", text: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function castVote(candidateId) {
+    setBusy(true);
+    try {
+      if (!account) throw new Error("Connect your wallet first.");
+
+      const provider = await getWalletProvider();
+      const signer = await provider.getSigner();
+      const signerAddress = await signer.getAddress();
+
+      if (signerAddress.toLowerCase() !== account.toLowerCase()) {
+        throw new Error("Wallet account changed. Please reconnect.");
+      }
+
+      const contract = new Contract(CONTRACT_ADDRESS, ABI, signer);
+
+      if (await contract.hasVoted(signerAddress)) {
+        setHasVoted(true);
+        throw new Error("This wallet has already cast its vote.");
+      }
+
+      setNotice({
+        kind: "info",
+        text: "Please confirm your voting transaction in MetaMask."
+      });
+
+      const tx = await contract.vote(candidateId);
+
+      setNotice({
+        kind: "info",
+        text: "Transaction submitted. Waiting for blockchain confirmation..."
+      });
+
+      await tx.wait();
+      await refresh(signerAddress);
+
+      setNotice({
+        kind: "success",
+        text: "Vote successfully recorded on the blockchain!"
+      });
+    } catch (error) {
+      setNotice({ kind: "error", text: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="site">
+      <header className="topbar">
+        <div className="container nav-content">
+          <a className="brand" href="#home">
+            <span className="brand-symbol">C</span>
+            <span className="brand-title">
+              CIVIC<span className="brand-dot">.</span>
+              <small>DECENTRALIZED VOTING</small>
+            </span>
+          </a>
+
+          <nav className="nav-links">
+            <a href="#overview">Overview</a>
+            <a href="#candidates">Candidates</a>
+          </nav>
+
+          <button
+            className="wallet-button"
+            onClick={connectWallet}
+            disabled={busy}
+          >
+            <span className="wallet-indicator" />
+            {account ? shortAddress(account) : "Connect Wallet"}
+          </button>
+        </div>
+      </header>
+
+      <main id="home">
+        <section className="hero">
+          <div className="container hero-layout">
+            <div className="hero-content">
+              <div className="eyebrow">
+                <span className="eyebrow-line" />
+                THE FUTURE OF PARTICIPATION
+              </div>
+              <h1>
+                Every voice.
+                <br />
+                <em>Every vote.</em>
+              </h1>
+              <p className="hero-description">
+                A thoughtful approach to blockchain voting.
+                Explore the candidates, connect your wallet
+                and make your choice on our local Ethereum network.
+              </p>
+
+              <div className="hero-actions">
+                <a href="#candidates" className="btn-primary">
+                  Explore Candidates <span>↗</span>
+                </a>
+                <button
+                  className="btn-outline"
+                  onClick={connectWallet}
+                  disabled={busy}
+                >
+                  {account ? "Wallet Connected" : "Connect MetaMask"}
+                </button>
+              </div>
+
+              <div className="hero-footnote">
+                <span className="pulse" />
+                {online ? "Local blockchain connected" : "Checking blockchain connection"}
+                <span className="footnote-divider" />
+                Ethereum Chain 31337
+              </div>
+            </div>
+
+            <aside className="election-panel">
+              <div className="panel-head">
+                <span className="panel-kicker">ELECTION 001</span>
+                <span className="panel-badge">LOCAL DEMO</span>
+              </div>
+
+              <div className="panel-main">
+                <p>Current Election</p>
+                <h2>Apu <span>vs.</span> Sazim</h2>
+                <div className="panel-rule" />
+                <div className="panel-row">
+                  <span>Election type</span>
+                  <strong>Blockchain Voting</strong>
+                </div>
+                <div className="panel-row">
+                  <span>Network</span>
+                  <strong>Hardhat Local</strong>
+                </div>
+                <div className="panel-row">
+                  <span>Wallet eligibility</span>
+                  <strong>One vote per address</strong>
+                </div>
+              </div>
+
+              <div className="panel-bottom">
+                <span className="panel-circle">↗</span>
+                <p>Make your choice count.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section className="container dashboard" id="overview">
+          <div className="section-heading">
+            <div>
+              <span className="section-overline">ELECTION INTELLIGENCE</span>
+              <h2>Election overview<span className="heading-period">.</span></h2>
+            </div>
+            <button
+              className="refresh-button"
+              onClick={refreshResults}
+              disabled={busy}
+            >
+              ↻ Refresh results
+            </button>
+          </div>
+
+          <div className={"notice notice-" + notice.kind} role="status">
+            <span className="notice-symbol">
+              {notice.kind === "success" ? "✓" : notice.kind === "error" ? "!" : "i"}
+            </span>
+            <span>{notice.text}</span>
+          </div>
+
+          <div className="stats-grid">
+            <div className="stat-card">
+              <span className="stat-label">REGISTERED CANDIDATES</span>
+              <strong>{loading ? "—" : candidates.length.toString().padStart(2, "0")}</strong>
+              <p>Active candidate profiles</p>
+              <span className="stat-detail">01 / CANDIDATES</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">TOTAL VOTES CAST</span>
+              <strong>{loading ? "—" : totalVotes.toString().padStart(2, "0")}</strong>
+              <p>Verified on-chain transactions</p>
+              <span className="stat-detail">02 / PARTICIPATION</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">YOUR VOTING STATUS</span>
+              <strong className="status-value">
+                {!account ? "Connect wallet" : hasVoted ? "Vote recorded" : "Ready to vote"}
+              </strong>
+              <p>{account ? shortAddress(account) : "No account connected"}</p>
+              <span className="stat-detail">03 / YOUR WALLET</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="container candidates-section" id="candidates">
+          <div className="section-heading">
+            <div>
+              <span className="section-overline">MEET THE CANDIDATES</span>
+              <h2>Make your choice<span className="heading-period">.</span></h2>
+              <p className="section-caption">
+                Select one candidate. Each wallet may vote only once.
+              </p>
+            </div>
+            <span className="candidate-count">
+              {candidates.length} Candidates
+            </span>
+          </div>
+
+          <div className="candidate-grid">
+            {candidates.map((candidate, index) => {
+              const percentage = totalVotes
+                ? (candidate.votes / totalVotes) * 100
+                : 0;
+
+              return (
+                <article className="candidate-card" key={candidate.id}>
+                  <div className="candidate-card-header">
+                    <span className="candidate-no">
+                      CANDIDATE {String(candidate.id).padStart(2, "0")}
+                    </span>
+                    {leader?.id === candidate.id && (
+                      <span className="leading-tag">Leading</span>
+                    )}
+                  </div>
+
+                  <div className={"candidate-avatar avatar-" + (index % 2)}>
+                    <span>{candidate.name.slice(0, 1).toUpperCase()}</span>
+                  </div>
+
+                  <h3>{candidate.name}</h3>
+                  <p className="candidate-subtitle">
+                    Official registered candidate
+                  </p>
+
+                  <div className="candidate-separator" />
+
+                  <div className="candidate-votes">
+                    <div>
+                      <span className="votes-label">TOTAL VOTES RECEIVED</span>
+                      <strong>{candidate.votes}</strong>
+                    </div>
+                    <span className="percentage">
+                      {percentage.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  <div
+                    className="vote-track"
+                    role="progressbar"
+                    aria-label={candidate.name + " vote share"}
+                    aria-valuenow={percentage}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div
+                      className="vote-fill"
+                      style={{ width: percentage + "%" }}
+                    />
+                  </div>
+
+                  <button
+                    className="cast-button"
+                    onClick={() => castVote(candidate.id)}
+                    disabled={!online || !account || hasVoted || busy}
+                  >
+                    {busy
+                      ? "Please wait..."
+                      : hasVoted
+                        ? "Your vote is recorded"
+                        : "Vote for " + candidate.name}
+                    <span>↗</span>
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+
+          {!loading && !candidates.length && (
+            <div className="empty-state">
+              No candidates available. Check your Hardhat deployment and refresh.
+            </div>
+          )}
+        </section>
+
+        <section className="container bottom-panel">
+          <div>
+            <span className="section-overline">TRANSPARENT BY DESIGN</span>
+            <h2>Your decision. On the blockchain.</h2>
+            <p>
+              Voting records are stored in the smart contract.
+              This application is a local educational prototype,
+              not a private or production-grade election system.
+            </p>
+          </div>
+          <div className="contract-box">
+            <span>SMART CONTRACT ADDRESS</span>
+            <code>{shortAddress(CONTRACT_ADDRESS)}</code>
+            <small>Hardhat Local · Chain ID 31337</small>
+          </div>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <div className="container footer-content">
+          <span className="footer-brand">CIVIC.</span>
+          <span>Built with Solidity, Hardhat, React & ethers.js</span>
+          <span>LOCAL DEVELOPMENT PROJECT © 2026</span>
+        </div>
+      </footer>
+    </div>
+  );
+}

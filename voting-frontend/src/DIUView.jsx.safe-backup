@@ -1,0 +1,430 @@
+import { useState } from "react";
+
+const translations = {
+  bn: {
+    academic: "শিক্ষার্থীদের একাডেমিক প্রজেক্ট",
+    department: "কম্পিউটার সায়েন্স অ্যান্ড ইঞ্জিনিয়ারিং বিভাগ",
+    overview: "সারসংক্ষেপ",
+    candidates: "প্রার্থীরা",
+    process: "ভোটিং প্রক্রিয়া",
+    connect: "ওয়ালেট সংযুক্ত করুন",
+    switch: "ভোটার পরিবর্তন করুন",
+    eyebrow: "ব্লকচেইনভিত্তিক ভোটিং সিস্টেম",
+    heroOne: "আপনার ভোট,",
+    heroTwo: "আপনার সিদ্ধান্ত।",
+    description: "Ethereum ব্লকচেইন ও MetaMask ব্যবহার করে তৈরি একটি পরীক্ষামূলক ডিজিটাল ভোটিং প্ল্যাটফর্ম। এখানে প্রতিটি ওয়ালেট থেকে একবার ভোট দেওয়া যায় এবং ফলাফল সরাসরি Smart Contract থেকে দেখানো হয়।",
+    explore: "প্রার্থীদের দেখুন",
+    local: "লোকাল ব্লকচেইন",
+    connected: "সংযুক্ত",
+    disconnected: "সংযোগ নেই",
+    demo: "একাডেমিক ডেমো",
+    election: "বর্তমান নির্বাচন",
+    notLoaded: "তথ্য লোড হচ্ছে",
+    network: "নেটওয়ার্ক",
+    rule: "ভোট দেওয়ার নিয়ম",
+    oneVote: "প্রতি ওয়ালেটে একটি ভোট",
+    summary: "নির্বাচনের সারসংক্ষেপ",
+    overviewDesc: "ব্লকচেইন থেকে পাওয়া সর্বশেষ তথ্য",
+    refresh: "ফলাফল আপডেট করুন",
+    count: "মোট প্রার্থী",
+    votes: "মোট ভোট",
+    wallet: "ওয়ালেটের অবস্থা",
+    walletReady: "ভোট দিতে পারবেন",
+    walletUsed: "ভোট দেওয়া হয়েছে",
+    walletMissing: "সংযুক্ত নয়",
+    totalVotes: "রেকর্ডকৃত মোট ভোট",
+    candidateSection: "প্রার্থী পরিচিতি",
+    select: "আপনার পছন্দের প্রার্থী নির্বাচন করুন",
+    selectHelp: "একটি ওয়ালেট থেকে শুধু একজন প্রার্থীকে একবার ভোট দেওয়া যাবে।",
+    candidate: "প্রার্থী",
+    recorded: "প্রাপ্ত ভোট",
+    share: "ভোটের হার",
+    leading: "এগিয়ে আছেন",
+    voteFor: "ভোট দিন",
+    submitted: "ভোট দেওয়া হয়েছে",
+    waiting: "অপেক্ষা করুন...",
+    empty: "কোনো প্রার্থী পাওয়া যায়নি। Blockchain Deployment যাচাই করুন।",
+    how: "ভোটিং প্রক্রিয়া",
+    steps: [
+      ["০১", "ওয়ালেট সংযুক্ত করুন", "Hardhat Local Network-এ MetaMask Wallet Connect করুন।"],
+      ["০২", "প্রার্থী নির্বাচন করুন", "আপনার পছন্দের প্রার্থীকে ভোট দেওয়ার বাটনে চাপুন।"],
+      ["০৩", "ভোট নিশ্চিত করুন", "MetaMask-এ Transaction Confirm করে ফলাফল দেখুন।"]
+    ],
+    technical: "প্রযুক্তিগত তথ্য",
+    contract: "স্মার্ট কন্ট্রাক্ট",
+    status: "নেটওয়ার্কের অবস্থা",
+    disclaimer: "এটি Daffodil International University-এর জন্য তৈরি একটি শিক্ষার্থী একাডেমিক ডেমো। এটি বিশ্ববিদ্যালয়ের আনুষ্ঠানিক নির্বাচন ব্যবস্থা নয়। এখানে ভোট গোপন ব্যালট নয়; Wallet Address-এর সঙ্গে সংশ্লিষ্ট তথ্য Blockchain-এ যাচাই করা যায়।",
+    footer: "একাডেমিক ব্লকচেইন প্রজেক্ট",
+    readyStatus: "ভোট দেওয়ার জন্য প্রস্তুত"
+  },
+  en: {
+    academic: "Student Academic Project",
+    department: "Department of Computer Science & Engineering",
+    overview: "Overview",
+    candidates: "Candidates",
+    process: "How it works",
+    connect: "Connect Wallet",
+    switch: "Switch Voter",
+    eyebrow: "BLOCKCHAIN-BASED VOTING SYSTEM",
+    heroOne: "Your vote.",
+    heroTwo: "Your decision.",
+    description: "An educational digital voting platform built with Ethereum and MetaMask. Each wallet can cast one vote, and results are retrieved directly from the smart contract.",
+    explore: "Explore Candidates",
+    local: "Local blockchain",
+    connected: "Connected",
+    disconnected: "Disconnected",
+    demo: "Academic Demo",
+    election: "Current Election",
+    notLoaded: "Awaiting election data",
+    network: "Network",
+    rule: "Voting Policy",
+    oneVote: "One vote per wallet",
+    summary: "Election Overview",
+    overviewDesc: "Latest information retrieved from the blockchain",
+    refresh: "Refresh Results",
+    count: "Total Candidates",
+    votes: "Total Votes",
+    wallet: "Wallet Status",
+    walletReady: "Eligible to vote",
+    walletUsed: "Vote recorded",
+    walletMissing: "Not connected",
+    totalVotes: "Total votes recorded",
+    candidateSection: "MEET THE CANDIDATES",
+    select: "Make your choice",
+    selectHelp: "Each wallet address may vote once for a single candidate.",
+    candidate: "Candidate",
+    recorded: "Votes Received",
+    share: "Vote Share",
+    leading: "Currently Leading",
+    voteFor: "Vote for",
+    submitted: "Vote Recorded",
+    waiting: "Please wait...",
+    empty: "No candidates found. Please check the blockchain deployment.",
+    how: "How Voting Works",
+    steps: [
+      ["01", "Connect Your Wallet", "Connect MetaMask to the Hardhat Local network."],
+      ["02", "Choose a Candidate", "Select your preferred candidate from the list."],
+      ["03", "Confirm Your Vote", "Approve the transaction in MetaMask and view the result."]
+    ],
+    technical: "Technical Information",
+    contract: "Smart Contract",
+    status: "Network Status",
+    disclaimer: "A student-built academic demonstration prepared for Daffodil International University. This is not an official university election system. Votes are not secret ballots; wallet-linked information can be inspected on the blockchain.",
+    footer: "Academic Blockchain Project",
+    readyStatus: "Ready to vote"
+  }
+};
+
+const bnNotices = {
+  "Connect MetaMask to participate in this local election.":
+    "ভোট দিতে MetaMask Wallet সংযুক্ত করুন।",
+  "Wallet connected. You can now participate in the election.":
+    "ওয়ালেট সফলভাবে সংযুক্ত হয়েছে। এখন ভোট দিতে পারবেন।",
+  "Latest voting results loaded from the blockchain.":
+    "ব্লকচেইন থেকে সর্বশেষ ফলাফল আনা হয়েছে।",
+  "Please confirm your voting transaction in MetaMask.":
+    "MetaMask থেকে ভোটের Transaction নিশ্চিত করুন।",
+  "Transaction submitted. Waiting for blockchain confirmation...":
+    "Transaction জমা হয়েছে। Blockchain Confirmation-এর অপেক্ষায়...",
+  "Vote successfully recorded on the blockchain!":
+    "আপনার ভোট সফলভাবে ব্লকচেইনে রেকর্ড হয়েছে!",
+  "Voter wallet switched successfully!":
+    "নতুন ভোটার ওয়ালেট সফলভাবে সংযুক্ত হয়েছে।",
+  "This wallet has already cast its vote.":
+    "এই ওয়ালেট থেকে ইতিমধ্যে ভোট দেওয়া হয়েছে।"
+};
+
+export default function DIUView({
+  account,
+  candidates,
+  totalVotes,
+  hasVoted,
+  online,
+  loading,
+  busy,
+  notice,
+  leader,
+  onConnect,
+  onSwitch,
+  onRefresh,
+  onVote,
+  shortAddress
+}) {
+  const [language, setLanguage] = useState("bn");
+  const t = translations[language];
+  const formatNumber = (number) =>
+    new Intl.NumberFormat(language === "bn" ? "bn-BD" : "en-US")
+      .format(number);
+
+  const alertText =
+    language === "bn"
+      ? (bnNotices[notice.text] || notice.text)
+      : notice.text;
+
+  const electionNames = candidates.length
+    ? candidates.map((candidate) => candidate.name).join("  /  ")
+    : t.notLoaded;
+
+  const contractAddress =
+    "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+  return (
+    <div className="diu-site" lang={language}>
+      <div className="campus-stripe" />
+
+      <header className="topbar">
+        <div className="container topbar-inner">
+          <a className="identity" href="#home">
+            <span className="identity-mark">DIU</span>
+            <span className="identity-copy">
+              <strong>Daffodil International University</strong>
+              <small>{t.department}</small>
+            </span>
+          </a>
+
+          <nav className="nav-links">
+            <a href="#overview">{t.overview}</a>
+            <a href="#candidates">{t.candidates}</a>
+            <a href="#process">{t.process}</a>
+          </nav>
+
+          <div className="header-actions">
+            <div className="language-switch" aria-label="Language">
+              <button
+                className={language === "bn" ? "selected" : ""}
+                onClick={() => setLanguage("bn")}
+                aria-pressed={language === "bn"}
+              >বাংলা</button>
+              <button
+                className={language === "en" ? "selected" : ""}
+                onClick={() => setLanguage("en")}
+                aria-pressed={language === "en"}
+              >EN</button>
+            </div>
+
+            <button
+              className="header-wallet"
+              onClick={account ? onSwitch : onConnect}
+              disabled={busy}
+            >
+              <span className="small-dot" />
+              {account ? t.switch : t.connect}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="home">
+        <section className="hero-section">
+          <div className="container hero-grid">
+            <div className="hero-copy">
+              <p className="eyebrow"><span />{t.eyebrow}</p>
+
+              <h1>{t.heroOne}<br /><em>{t.heroTwo}</em></h1>
+              <p className="hero-description">{t.description}</p>
+
+              <div className="hero-buttons">
+                <a className="main-button" href="#candidates">
+                  {t.explore}<span aria-hidden="true">↗</span>
+                </a>
+                <button className="outline-button"
+                  onClick={account ? onSwitch : onConnect}
+                  disabled={busy}>
+                  {account ? t.switch : t.connect}
+                </button>
+              </div>
+
+              <div className="hero-metadata">
+                <span className={"connection-led " + (online ? "on" : "off")} />
+                {t.local}: {online ? t.connected : t.disconnected}
+                <span className="metadata-separator" />
+                Chain ID 31337
+              </div>
+            </div>
+
+            <aside className="election-card">
+              <div className="election-card-top">
+                <span>{t.demo}</span>
+                <span className="election-code">DIU / CSE / 001</span>
+              </div>
+              <p className="card-eyebrow">{t.election}</p>
+              <h2>{electionNames}</h2>
+              <div className="election-divider" />
+              <div className="detail-line">
+                <span>{t.network}</span><strong>Hardhat Local</strong>
+              </div>
+              <div className="detail-line">
+                <span>{t.rule}</span><strong>{t.oneVote}</strong>
+              </div>
+              <div className="detail-line">
+                <span>{t.count}</span>
+                <strong>{loading ? "—" : formatNumber(candidates.length)}</strong>
+              </div>
+              <div className="election-card-foot">
+                <span className="bengal-accent" />
+                {t.academic} · 2026
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section className="container section-area" id="overview">
+          <div className="section-heading">
+            <div>
+              <p className="section-kicker">{t.academic}</p>
+              <h2>{t.summary}</h2>
+              <p>{t.overviewDesc}</p>
+            </div>
+            <button className="refresh-btn"
+              onClick={onRefresh} disabled={busy}>
+              <span aria-hidden="true">↻</span> {t.refresh}
+            </button>
+          </div>
+
+          <div className={"notice notice-" + (notice.kind || "info")}
+            role="status" aria-live="polite">
+            <span className="notice-icon">
+              {notice.kind === "success" ? "✓" :
+                notice.kind === "error" ? "!" : "i"}
+            </span>
+            <span>{alertText}</span>
+          </div>
+
+          <div className="stats-grid">
+            <div className="stat-box">
+              <span className="stat-index">01 / CANDIDATES</span>
+              <p>{t.count}</p>
+              <strong>{loading ? "—" : formatNumber(candidates.length)}</strong>
+            </div>
+            <div className="stat-box">
+              <span className="stat-index">02 / VOTES</span>
+              <p>{t.votes}</p>
+              <strong>{loading ? "—" : formatNumber(totalVotes)}</strong>
+            </div>
+            <div className="stat-box wallet-stat">
+              <span className="stat-index">03 / WALLET</span>
+              <p>{t.wallet}</p>
+              <strong>
+                {!account ? t.walletMissing :
+                  hasVoted ? t.walletUsed : t.walletReady}
+              </strong>
+              <small>{account ? shortAddress(account) : "MetaMask"}</small>
+            </div>
+          </div>
+        </section>
+
+        <section className="container section-area candidate-area"
+          id="candidates">
+          <div className="section-heading">
+            <div>
+              <p className="section-kicker">{t.candidateSection}</p>
+              <h2>{t.select}</h2>
+              <p>{t.selectHelp}</p>
+            </div>
+            <span className="count-pill">
+              {formatNumber(candidates.length)} {t.candidates}
+            </span>
+          </div>
+
+          <div className="candidate-grid">
+            {candidates.map((candidate, index) => {
+              const percentage = totalVotes
+                ? candidate.votes / totalVotes * 100 : 0;
+
+              return (
+                <article className="candidate-tile" key={candidate.id}>
+                  <div className="candidate-head">
+                    <span className="candidate-id">
+                      {t.candidate} {formatNumber(candidate.id)}
+                    </span>
+                    {leader?.id === candidate.id &&
+                      <span className="leading-pill">{t.leading}</span>}
+                  </div>
+                  <div className={"avatar avatar-" + (index % 2)}>
+                    {candidate.name.charAt(0).toUpperCase()}
+                  </div>
+                  <h3>{candidate.name}</h3>
+                  <p className="candidate-role">{t.candidate} / DIU Demo</p>
+                  <div className="tile-divider" />
+                  <div className="votes-line">
+                    <div>
+                      <span>{t.recorded}</span>
+                      <strong>{formatNumber(candidate.votes)}</strong>
+                    </div>
+                    <div className="vote-percent">
+                      {language === "bn"
+                        ? formatNumber(Number(percentage.toFixed(1)))
+                        : percentage.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div className="progress-line" role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={percentage}
+                    aria-label={candidate.name + " vote share"}>
+                    <div style={{ width: percentage + "%" }} />
+                  </div>
+                  <button className="vote-button"
+                    onClick={() => onVote(candidate.id)}
+                    disabled={!online || !account || hasVoted || busy}>
+                    {busy ? t.waiting :
+                      hasVoted ? t.submitted :
+                      t.voteFor + " " + candidate.name}
+                    <span aria-hidden="true">↗</span>
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+          {!loading && candidates.length === 0 &&
+            <div className="empty-state">{t.empty}</div>}
+        </section>
+
+        <section className="container section-area" id="process">
+          <div className="section-heading">
+            <div>
+              <p className="section-kicker">BLOCKCHAIN WORKFLOW</p>
+              <h2>{t.how}</h2>
+            </div>
+          </div>
+          <div className="workflow-grid">
+            {t.steps.map((step) => (
+              <div className="workflow-card" key={step[0]}>
+                <span>{step[0]}</span>
+                <h3>{step[1]}</h3>
+                <p>{step[2]}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="container tech-section">
+          <div>
+            <p className="section-kicker">{t.technical}</p>
+            <h2>{t.contract}</h2>
+            <p>Solidity · Hardhat 3 · ethers.js · React · MetaMask</p>
+          </div>
+          <div className="address-panel">
+            <span>CONTRACT ADDRESS</span>
+            <code>{shortAddress(contractAddress)}</code>
+            <small>Hardhat Local — 31337</small>
+          </div>
+        </section>
+      </main>
+
+      <footer className="page-footer">
+        <div className="container">
+          <div className="footer-heading">
+            <strong>DIU</strong>
+            <span>{t.footer}</span>
+          </div>
+          <p>{t.disclaimer}</p>
+          <div className="footer-bottom">
+            <span>Daffodil International University · CSE</span>
+            <span>Student Project / 2026</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
